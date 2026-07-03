@@ -33,18 +33,23 @@ jobs:
           packages: 'platforms;android-34 build-tools;34.0.0'
 
       - name: 安装依赖
+        working-directory: app
         run: npm install
 
       - name: 构建 Web 应用
+        working-directory: app
         run: npm run build
 
       - name: 添加 Android 平台
+        working-directory: app
         run: npx cap add android
 
       - name: 同步 Web 资源到 Android
+        working-directory: app
         run: npx cap sync android
 
       - name: 生成图标资源
+        working-directory: app
         run: |
           mkdir -p android/app/src/main/res/mipmap-hdpi
           mkdir -p android/app/src/main/res/mipmap-mdpi
@@ -52,23 +57,21 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
           mkdir -p android/app/src/main/res/drawable
-          # 使用 Capacitor 默认图标资源命令
           npx capacitor-assets generate --android || echo "capacitor-assets not available, using default"
 
       - name: 设置 Gradle 可执行权限
+        working-directory: app
         run: chmod +x android/gradlew
 
       - name: 构建 Debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug
+        working-directory: app/android
+        run: ./gradlew assembleDebug
         env:
           ANDROID_HOME: ${{ steps.setup-android.outputs.ANDROID_HOME }}
 
       - name: 构建 Release APK (未签名)
-        run: |
-          cd android
-          ./gradlew assembleRelease
+        working-directory: app/android
+        run: ./gradlew assembleRelease
         env:
           ANDROID_HOME: ${{ steps.setup-android.outputs.ANDROID_HOME }}
 
@@ -77,6 +80,6 @@ jobs:
         with:
           name: douyin-downloader-apk
           path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
+            app/android/app/build/outputs/apk/debug/app-debug.apk
+            app/android/app/build/outputs/apk/release/app-release-unsigned.apk
           retention-days: 30
