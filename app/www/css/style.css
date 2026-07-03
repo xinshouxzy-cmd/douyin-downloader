@@ -1,0 +1,232 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0a0a0a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e0e0e0;
+    /* 防止iOS橡皮筋效果导致的白边 */
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.container {
+    width: 100%;
+    max-width: 500px;
+    padding: 16px;
+}
+.card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 24px 20px;
+}
+.logo { text-align: center; margin-bottom: 20px; }
+.logo-icon { font-size: 42px; margin-bottom: 4px; }
+.logo h1 {
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fe2c55, #25f4ee);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.subtitle {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 4px;
+}
+
+.input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+textarea {
+    flex: 1;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 14px;
+    resize: none;
+    height: 46px;
+    line-height: 20px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+textarea:focus { border-color: #fe2c55; }
+textarea::placeholder { color: rgba(255,255,255,0.25); }
+
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.5; pointer-events: none; }
+
+.btn-parse {
+    background: linear-gradient(135deg, #fe2c55, #ff6b81);
+    color: #fff;
+}
+
+.btn-download {
+    background: linear-gradient(135deg, #25f4ee, #00d4ff);
+    color: #000;
+    width: 100%;
+    margin-top: 8px;
+    padding: 14px;
+    font-size: 15px;
+}
+
+.result { display: none; }
+.result.show { display: block; margin-top: 16px; }
+
+.video-card {
+    background: rgba(255,255,255,0.04);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.video-preview {
+    position: relative;
+    aspect-ratio: 9/16;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+}
+.video-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.video-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+    background: #000;
+}
+.play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.25);
+}
+.play-btn {
+    width: 56px;
+    height: 56px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #000;
+    transition: transform 0.2s;
+}
+.video-preview:active .play-btn { transform: scale(0.9); }
+
+.video-info { padding: 14px 16px 8px; }
+.video-desc {
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    color: #fff;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.video-meta {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: rgba(255,255,255,0.45);
+}
+.video-meta span { display: inline-flex; align-items: center; gap: 3px; }
+
+.author-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.author-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255,255,255,0.08);
+}
+.author-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+}
+.btn-row { padding: 0 16px 16px; }
+
+.error-box {
+    background: rgba(255,59,48,0.12);
+    border: 1px solid rgba(255,59,48,0.25);
+    border-radius: 12px;
+    padding: 14px;
+    color: #ff3b30;
+    font-size: 14px;
+    text-align: center;
+}
+
+.loading {
+    text-align: center;
+    padding: 32px;
+    color: rgba(255,255,255,0.4);
+    font-size: 14px;
+}
+.spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: #fe2c55;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.2);
+}
+
+/* 适配小屏幕 */
+@media (max-width: 360px) {
+    .card { padding: 20px 14px; }
+    .logo h1 { font-size: 19px; }
+    textarea { height: 42px; font-size: 13px; }
+    .btn { padding: 10px 16px; font-size: 13px; }
+}
+
+/* 安全区域适配 (iPhone X+) */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .container { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+}

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>抖音无水印下载器</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">
+                <div class="logo-icon">🎬</div>
+                <h1>抖音无水印下载器</h1>
+                <p class="subtitle">粘贴分享链接，一键下载</p>
+            </div>
+
+            <div class="input-group">
+                <textarea id="urlInput" placeholder="粘贴抖音分享链接...&#10;支持：短链接 / 长链接 / 分享文本"></textarea>
+                <button class="btn btn-parse" id="parseBtn" onclick="parseVideo()">解析</button>
+            </div>
+
+            <div id="loading" class="loading" style="display:none">
+                <div class="spinner"></div>
+                <div id="loadingText">正在解析视频...</div>
+            </div>
+
+            <div id="result" class="result">
+                <div id="errorBox" class="error-box" style="display:none"></div>
+                <div id="videoCard" class="video-card" style="display:none">
+                    <div class="video-preview" id="preview" onclick="playPreview()">
+                        <img id="coverImg" src="" alt="">
+                        <video id="previewVideo" controls playsinline
+                               webkit-playsinline x5-video-player-type="h5"
+                               x5-video-orientation="portrait"></video>
+                        <div class="play-overlay" id="playOverlay">
+                            <div class="play-btn">▶</div>
+                        </div>
+                    </div>
+                    <div class="video-info">
+                        <div class="video-desc" id="videoDesc"></div>
+                        <div class="video-meta" id="videoMeta"></div>
+                    </div>
+                    <div class="author-row">
+                        <img class="author-avatar" id="authorAvatar" src="" alt="" onerror="this.style.display='none'">
+                        <span class="author-name" id="authorName"></span>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-download" id="downloadBtn" onclick="downloadVideo()">下载无水印视频</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer">遵义农商银行</div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

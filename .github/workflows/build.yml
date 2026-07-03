@@ -1,0 +1,82 @@
+name: Build Android APK
+
+# 推送到 main 分支时自动构建
+on:
+  push:
+    branches: [main, master]
+  # 支持手动触发
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装 Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0'
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 构建 Web 应用
+        run: npm run build
+
+      - name: 添加 Android 平台
+        run: npx cap add android
+
+      - name: 同步 Web 资源到 Android
+        run: npx cap sync android
+
+      - name: 生成图标资源
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          mkdir -p android/app/src/main/res/drawable
+          # 使用 Capacitor 默认图标资源命令
+          npx capacitor-assets generate --android || echo "capacitor-assets not available, using default"
+
+      - name: 设置 Gradle 可执行权限
+        run: chmod +x android/gradlew
+
+      - name: 构建 Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+        env:
+          ANDROID_HOME: ${{ steps.setup-android.outputs.ANDROID_HOME }}
+
+      - name: 构建 Release APK (未签名)
+        run: |
+          cd android
+          ./gradlew assembleRelease
+        env:
+          ANDROID_HOME: ${{ steps.setup-android.outputs.ANDROID_HOME }}
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: douyin-downloader-apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+          retention-days: 30
