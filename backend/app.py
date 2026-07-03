@@ -717,7 +717,9 @@ HTML = r'''<!DOCTYPE html>
                     const b64 = await blobToBase64(blob);
                     const filename = 'douyin_'+Date.now()+'.mp4';
                     await Capacitor.Plugins.Filesystem.writeFile({
-                        path: filename, data: b64, directory: 'Downloads'
+                        path: 'Download/douyin_' + Date.now() + '.mp4',
+                        data: b64,
+                        directory: 'ExternalStorage'
                     });
                     btn.textContent = '✅ 已保存到下载目录';
                 } else {
