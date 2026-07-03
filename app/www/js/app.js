@@ -1,8 +1,8 @@
-// 抖音无水印下载器 v2.0
-// 双模式：Capacitor APK用原生HTTP / 浏览器用后端API
+// 抖音无水印下载器 v2.1
+// Capacitor APK使用fetch() / 浏览器使用后端API
 
 const BACKEND_URL = 'http://localhost:5003';
-const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
+const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
 let currentVideoUrl = '';
 let currentVideoUrls = [];
@@ -13,52 +13,70 @@ function isCapacitor() {
     return typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform();
 }
 
-// ====== Capacitor 原生模式（APK内使用，无需后端） ======
+// 通用HTTP GET（Capacitor环境直接fetch，无CORS限制）
+async function httpGet(url) {
+    const resp = await fetch(url, {
+        headers: {
+            'User-Agent': MOBILE_UA,
+            'Accept': 'text/html,application/xhtml+xml,text/plain,*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+        }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.text();
+}
+
+// 跟随重定向获取最终URL
+async function followRedirect(url) {
+    const resp = await fetch(url, {
+        method: 'HEAD',
+        headers: { 'User-Agent': MOBILE_UA },
+        redirect: 'follow'
+    });
+    return resp.url;
+}
+
+// ====== Capacitor APK模式（fetch直连，无CORS） ======
 async function parseInCapacitor(text) {
-    const { Http } = await import('@capacitor-community/http');
-    
     const urlMatch = text.match(/https?:\/\/[^\s]+/);
     const rawUrl = urlMatch ? urlMatch[0] : text.trim();
 
-    // 提取视频ID
+    // 尝试直接匹配视频ID
     let videoId = null;
-    const longPatterns = [/\/video\/(\d+)/, /\/share\/video\/(\d+)/, /video_id=(\d+)/, /aweme_id=(\d+)/];
-    for (const p of longPatterns) {
+    const patterns = [/\/video\/(\d+)/, /\/share\/video\/(\d+)/, /video_id=(\d+)/, /aweme_id=(\d+)/];
+    for (const p of patterns) {
         const m = rawUrl.match(p);
         if (m) { videoId = m[1]; break; }
     }
 
-    // 短链接解析
+    // 短链接：跟随重定向
     if (!videoId) {
         try {
-            const resp = await Http.request({
-                method: 'GET', url: rawUrl,
-                headers: { 'User-Agent': MOBILE_UA },
-                responseType: 'text',
-                connectTimeout: 15000, readTimeout: 15000,
-            });
-            const html = resp.data;
-            for (const p of [/\/video\/(\d+)/, /"aweme_id":"(\d+)"/, /"itemId":"(\d+)"/]) {
-                const m = html.match(p);
+            const finalUrl = await followRedirect(rawUrl);
+            for (const p of patterns) {
+                const m = finalUrl.match(p);
                 if (m) { videoId = m[1]; break; }
             }
-        } catch(e) {}
+            if (!videoId) {
+                const html = await httpGet(rawUrl);
+                for (const p of [/\/video\/(\d+)/, /"aweme_id":"(\d+)"/, /"itemId":"(\d+)"/]) {
+                    const m = html.match(p);
+                    if (m) { videoId = m[1]; break; }
+                }
+            }
+        } catch(e) {
+            throw new Error('无法识别该链接，请确认是抖音分享链接');
+        }
     }
 
-    if (!videoId) throw new Error('无法识别该链接');
+    if (!videoId) throw new Error('无法提取视频ID');
 
     // 从 iesdouyin.com 解析
-    const shareUrl = `https://www.iesdouyin.com/share/video/${videoId}`;
-    const resp = await Http.request({
-        method: 'GET', url: shareUrl,
-        headers: { 'User-Agent': MOBILE_UA, 'Accept': 'text/html', 'Accept-Language': 'zh-CN,zh;q=0.9' },
-        responseType: 'text',
-        connectTimeout: 15000, readTimeout: 15000,
-    });
+    const shareUrl = 'https://www.iesdouyin.com/share/video/' + videoId;
+    const html = await httpGet(shareUrl);
 
-    const html = resp.data;
     const m = html.match(/window\._ROUTER_DATA\s*=\s*/);
-    if (!m) throw new Error('数据解析失败');
+    if (!m) throw new Error('数据解析失败，视频可能不存在');
 
     let depth = 0, inStr = false, escape = false;
     const start = m.index + m[0].length;
@@ -85,28 +103,25 @@ function extractFromRouterData(data) {
     for (const key in loaderData) {
         const ld = loaderData[key];
         if (typeof ld !== 'object' || !ld.videoInfoRes) continue;
-        const vres = ld.videoInfoRes;
-        const items = vres.item_list;
-        if (!items || !items.length) return { error: '视频不存在' };
+        const items = (ld.videoInfoRes.item_list || []);
+        if (!items.length) return { error: '视频不存在或已被删除' };
 
         const item = items[0];
         const video = item.video || {};
-        const playAddr = video.play_addr || {};
-        const urlList = playAddr.url_list || [];
+        const urlList = (video.play_addr || {}).url_list || [];
         if (!urlList.length) return { error: '未找到视频地址' };
 
-        const videoUrls = [];
+        const allUrls = [];
         for (const u of urlList.slice(0, 3)) {
-            videoUrls.push(u.replace('playwm', 'play'));
-            videoUrls.push(u.replace('/playwm/', '/play/'));
-            if (u.includes('play') && !u.includes('playwm')) videoUrls.push(u);
+            allUrls.push(u.replace('playwm', 'play'));
+            allUrls.push(u.replace('/playwm/', '/play/'));
+            if (u.includes('play') && !u.includes('playwm')) allUrls.push(u);
         }
-        const dlAddr = video.download_addr || {};
-        for (const u of (dlAddr.url_list || []).slice(0, 2)) videoUrls.push(u);
+        for (const u of ((video.download_addr || {}).url_list || []).slice(0, 2)) allUrls.push(u);
 
         const seen = new Set();
         const unique = [];
-        for (const u of videoUrls) {
+        for (const u of allUrls) {
             const base = u.split('?')[0];
             if (!seen.has(base)) { seen.add(base); unique.push(u); }
         }
@@ -118,15 +133,15 @@ function extractFromRouterData(data) {
             duration: video.duration || 0,
             video_url: unique[0] || urlList[0].replace('playwm', 'play'),
             video_urls: unique,
-            author: { nickname: (item.author||{}).nickname||'', avatar: ((item.author||{}).avatar_medium||{}).url_list?.[0]||'' },
-            cover_url: ((video.cover||{}).url_list||[])[0] || '',
+            author: { nickname: (item.author || {}).nickname || '', avatar: (((item.author || {}).avatar_medium || {}).url_list || [])[0] || '' },
+            cover_url: ((video.cover || {}).url_list || [])[0] || '',
             stats: item.statistics || {},
         };
     }
-    return { error: '解析失败' };
+    return { error: '解析失败，请确认链接有效' };
 }
 
-// ====== 浏览器模式（调用本地Flask） ======
+// ====== 浏览器模式（调用Flask后端） ======
 async function parseInBrowser(text) {
     const resp = await fetch(BACKEND_URL + '/api/parse', {
         method: 'POST',
@@ -136,7 +151,7 @@ async function parseInBrowser(text) {
     return await resp.json();
 }
 
-// 主动解析
+// 主入口
 async function parseVideo() {
     const text = document.getElementById('urlInput').value.trim();
     if (!text) return;
@@ -145,12 +160,7 @@ async function parseVideo() {
     hideResult();
 
     try {
-        let result;
-        if (isCapacitor()) {
-            result = await parseInCapacitor(text);
-        } else {
-            result = await parseInBrowser(text);
-        }
+        const result = isCapacitor() ? await parseInCapacitor(text) : await parseInBrowser(text);
         if (result.error) throw new Error(result.error);
         showVideo(result);
     } catch (e) {
@@ -166,38 +176,36 @@ async function downloadVideo() {
     const btn = document.getElementById('downloadBtn');
     const origText = btn.textContent;
     btn.disabled = true;
+    btn.textContent = '下载中...';
 
     try {
         if (isCapacitor()) {
-            btn.textContent = '下载中...';
-            const { Filesystem } = await import('@capacitor/filesystem');
-            
-            // 尝试所有URL
+            // Capacitor APK：用原生文件系统保存
+            const FS = window.Capacitor.Plugins.Filesystem;
+            const urls = [currentVideoUrl, ...currentVideoUrls.filter(function(u) { return u !== currentVideoUrl; })];
             let blob = null;
-            const urls = [currentVideoUrl, ...currentVideoUrls.filter(u => u !== currentVideoUrl)];
             for (const url of urls) {
                 try {
                     const resp = await fetch(url);
-                    if (!resp.ok || (resp.headers.get('content-type')||'').includes('text/html')) continue;
+                    const ct = resp.headers.get('content-type') || '';
+                    if (!resp.ok || ct.includes('text/html')) continue;
                     blob = await resp.blob();
                     if (blob.size > 1000) break;
                 } catch(e) { continue; }
             }
 
-            if (!blob) throw new Error('所有链接失效');
+            if (!blob) throw new Error('所有下载链接失效，请重新解析');
 
-            const base64 = await new Promise((resolve, reject) => {
+            const base64 = await new Promise(function(resolve, reject) {
                 const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onloadend = function() { resolve(reader.result.split(',')[1]); };
                 reader.onerror = reject;
                 reader.readAsDataURL(blob);
             });
 
-            const filename = `douyin_${Date.now()}.mp4`;
-            await Filesystem.writeFile({ path: filename, data: base64, directory: 'Downloads' });
+            await FS.writeFile({ path: 'douyin_' + Date.now() + '.mp4', data: base64, directory: 'Downloads' });
             btn.textContent = '✅ 已保存到下载目录';
         } else {
-            btn.textContent = '下载中...';
             const resp = await fetch(BACKEND_URL + '/api/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -205,17 +213,16 @@ async function downloadVideo() {
             });
             const data = await resp.json();
             if (data.success) {
-                const dl = data.download_url.startsWith('http') ? data.download_url : BACKEND_URL + data.download_url;
-                window.open(dl, '_blank');
+                window.open(data.download_url.startsWith('http') ? data.download_url : BACKEND_URL + data.download_url, '_blank');
                 btn.textContent = '✅ ' + data.file_size;
             } else {
-                btn.textContent = '❌ ' + (data.error || '失败');
+                btn.textContent = '❌ ' + (data.error || '下载失败');
             }
         }
     } catch (e) {
         btn.textContent = '❌ ' + (e.message || '下载失败');
     } finally {
-        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2500);
+        setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2500);
     }
 }
 
@@ -227,9 +234,9 @@ function showVideo(data) {
     currentAwemeId = data.aweme_id || '';
     document.getElementById('coverImg').src = data.cover_url || '';
     document.getElementById('videoDesc').textContent = data.desc || '无描述';
-    document.getElementById('authorName').textContent = (data.author||{}).nickname || '';
+    document.getElementById('authorName').textContent = (data.author || {}).nickname || '';
     const av = document.getElementById('authorAvatar');
-    if ((data.author||{}).avatar) { av.src = data.author.avatar; av.style.display = 'block'; }
+    if ((data.author || {}).avatar) { av.src = data.author.avatar; av.style.display = 'block'; }
     else { av.style.display = 'none'; }
 
     let meta = '';
@@ -253,31 +260,14 @@ function showVideo(data) {
 }
 
 function playPreview() {
-    const v = document.getElementById('previewVideo');
     document.getElementById('playOverlay').style.display = 'none';
     document.getElementById('coverImg').style.display = 'none';
-    v.style.display = 'block';
-    v.play().catch(()=>{});
+    document.getElementById('previewVideo').style.display = 'block';
+    document.getElementById('previewVideo').play().catch(function(){});
 }
 
-function showError(m) {
-    document.getElementById('videoCard').style.display = 'none';
-    document.getElementById('errorBox').style.display = 'block';
-    document.getElementById('errorBox').textContent = m;
-    document.getElementById('result').classList.add('show');
-}
-function hideResult() {
-    document.getElementById('result').classList.remove('show');
-    document.getElementById('videoCard').style.display = 'none';
-    document.getElementById('errorBox').style.display = 'none';
-}
-function showLoading(s, t) {
-    document.getElementById('loading').style.display = s ? 'block' : 'none';
-    document.getElementById('loadingText').textContent = t || '';
-    document.getElementById('parseBtn').disabled = s;
-}
+function showError(m) { document.getElementById('videoCard').style.display='none';document.getElementById('errorBox').style.display='block';document.getElementById('errorBox').textContent=m;document.getElementById('result').classList.add('show'); }
+function hideResult() { document.getElementById('result').classList.remove('show');document.getElementById('videoCard').style.display='none';document.getElementById('errorBox').style.display='none'; }
+function showLoading(s,t) { document.getElementById('loading').style.display=s?'block':'none';document.getElementById('loadingText').textContent=t||'';document.getElementById('parseBtn').disabled=s; }
 function formatNum(n) { return n>=10000?(n/10000).toFixed(1)+'w':n>=1000?(n/1000).toFixed(1)+'k':String(n); }
-
-document.getElementById('urlInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); parseVideo(); }
-});
+document.getElementById('urlInput').addEventListener('keydown', function(e) { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); parseVideo(); } });
