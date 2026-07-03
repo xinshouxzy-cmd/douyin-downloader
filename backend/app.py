@@ -313,30 +313,23 @@ def api_parse():
 
 @app.route("/api/download", methods=["POST"])
 def api_download():
-    """返回视频下载信息（CDN直链），不消耗服务器流量"""
+    """重新解析获取最新CDN链接（避免过期）"""
     data = request.get_json()
-    video_url = data.get("video_url", "").strip()
+    aweme_id = data.get("aweme_id", "").strip()
+    video_url = data.get("video_url", "")
     video_urls = data.get("video_urls", [])
-    aweme_id = data.get("aweme_id", "")
-    desc = data.get("desc", "")
 
-    if not video_url:
-        return jsonify({"success": False, "error": "缺少视频URL"})
+    if aweme_id:
+        result = parse_video(aweme_id)
+        if result and result.get("success"):
+            return jsonify(result)
 
-    # 收集所有可用URL
+    # fallback: 返回原来的URL
     all_urls = [video_url]
     for u in (video_urls or []):
         if u != video_url and u not in all_urls:
             all_urls.append(u)
-
-    return jsonify({
-        "success": True,
-        "video_url": video_url,
-        "video_urls": all_urls,
-        "desc": desc,
-        "aweme_id": aweme_id,
-        "message": "请使用系统浏览器打开下载链接"
-    })
+    return jsonify({"success": True, "video_url": all_urls[0], "video_urls": all_urls})
 
 
 @app.route("/downloads/<path:filename>")
@@ -706,35 +699,24 @@ HTML = r'''<!DOCTYPE html>
             const btn = document.getElementById('downloadBtn');
             const origText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '下载中...';
+            btn.textContent = '获取下载链接...';
 
             try {
-                // APK环境：用原生文件系统下载到手机
-                if (typeof Capacitor !== 'undefined' && Capacitor.Plugins.Filesystem) {
-                    const fileResp = await fetch(currentVideoUrl);
-                    if (!fileResp.ok) throw new Error('下载失败');
-                    const blob = await fileResp.blob();
-                    const b64 = await blobToBase64(blob);
-                    const filename = 'douyin_'+Date.now()+'.mp4';
-                    await Capacitor.Plugins.Filesystem.writeFile({
-                        path: 'Download/douyin_' + Date.now() + '.mp4',
-                        data: b64,
-                        directory: 'ExternalStorage'
-                    });
-                    btn.textContent = '✅ 已保存到下载目录';
-                } else {
-                    // 网页端：直接打开CDN链接
-                    window.open(currentVideoUrl, '_blank');
-                    btn.textContent = '✅ 下载已开始';
-                }
-                setTimeout(() => {
-                    btn.textContent = origText;
-                    btn.disabled = false;
-                }, 2500);
+                // 重新从后端拿新鲜链接（CDN有时效性）
+                const resp = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({video_url: currentVideoUrl, aweme_id: currentAwemeId, video_urls: currentVideoUrls})
+                });
+                const data = await resp.json();
+                const url = data.success ? data.video_url : currentVideoUrl;
+                window.open(url, '_blank');
+                btn.textContent = '✅ 下载已开始';
+                setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2500);
             } catch (e) {
-                btn.textContent = '❌ ' + (e.message || '下载失败');
+                window.open(currentVideoUrl, '_blank');
+                btn.textContent = origText;
                 btn.disabled = false;
-                setTimeout(() => { btn.textContent = origText; }, 2500);
             }
         }
 
