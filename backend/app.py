@@ -313,19 +313,30 @@ def api_parse():
 
 @app.route("/api/download", methods=["POST"])
 def api_download():
+    """返回视频下载信息（CDN直链），不消耗服务器流量"""
     data = request.get_json()
     video_url = data.get("video_url", "").strip()
-    desc = data.get("desc", "")
-    aweme_id = data.get("aweme_id", "")
     video_urls = data.get("video_urls", [])
+    aweme_id = data.get("aweme_id", "")
+    desc = data.get("desc", "")
 
     if not video_url:
         return jsonify({"success": False, "error": "缺少视频URL"})
 
-    result = download_video_from_url(video_url, desc, aweme_id, video_urls)
-    if result.get("success"):
-        result["download_url"] = f"/downloads/{result['filename']}"
-    return jsonify(result)
+    # 收集所有可用URL
+    all_urls = [video_url]
+    for u in (video_urls or []):
+        if u != video_url and u not in all_urls:
+            all_urls.append(u)
+
+    return jsonify({
+        "success": True,
+        "video_url": video_url,
+        "video_urls": all_urls,
+        "desc": desc,
+        "aweme_id": aweme_id,
+        "message": "请使用系统浏览器打开下载链接"
+    })
 
 
 @app.route("/downloads/<path:filename>")
@@ -688,47 +699,19 @@ HTML = r'''<!DOCTYPE html>
             btn.textContent = '下载中...';
 
             try {
-                const resp = await fetch('/api/download', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({video_url: currentVideoUrl, desc: currentDesc, aweme_id: currentAwemeId, video_urls: currentVideoUrls})
-                });
-                const data = await resp.json();
-
-                if (data.success) {
-                    const dlUrl = data.download_url.startsWith('http') ? data.download_url : location.origin + data.download_url;
-
-                    // APK环境：使用原生文件系统保存
-                    if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
-                        try {
-                            const fileResp = await fetch(dlUrl);
-                            const blob = await fileResp.blob();
-                            const b64 = await blobToBase64(blob);
-                            const filename = 'douyin_'+Date.now()+'.mp4';
-                            await Capacitor.Plugins.Filesystem.writeFile({
-                                path: filename, data: b64, directory: 'Downloads'
-                            });
-                            btn.textContent = `✅ 已保存到下载目录 (${data.file_size})`;
-                        } catch(fsErr) {
-                            // 备用：用系统浏览器打开下载链接
-                            window.open(dlUrl, '_system');
-                            btn.textContent = `✅ 下载完成 (${data.file_size})`;
-                        }
-                    } else {
-                        // 浏览器环境：直接打开下载链接
-                        window.open(dlUrl, '_blank');
-                        btn.textContent = `✅ 下载完成 (${data.file_size})`;
-                    }
-
-                    setTimeout(() => {
-                        btn.textContent = '下载无水印视频';
-                        btn.disabled = false;
-                    }, 2500);
+                if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+                    // APK内：用系统浏览器打开CDN直链，触发安卓原生下载（自动保存到Download目录）
+                    window.open(currentVideoUrl, '_system');
+                    btn.textContent = '✅ 下载已开始';
                 } else {
-                    btn.textContent = '❌ 下载失败';
-                    btn.disabled = false;
-                    setTimeout(() => { btn.textContent = '下载无水印视频'; }, 2000);
+                    // 网页端：直接打开CDN链接
+                    window.open(currentVideoUrl, '_blank');
+                    btn.textContent = '✅ 下载已开始';
                 }
+                setTimeout(() => {
+                    btn.textContent = '下载无水印视频';
+                    btn.disabled = false;
+                }, 2500);
             } catch (e) {
                 btn.textContent = '下载无水印视频';
                 btn.disabled = false;
