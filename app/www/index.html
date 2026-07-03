@@ -2,58 +2,339 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>抖音无水印下载器</title>
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{
+            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+            background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#e0e0e0;
+        }
+        .container{width:100%;max-width:500px;padding:16px}
+        .card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:24px 20px}
+        .logo{text-align:center;margin-bottom:20px}
+        .logo-icon{font-size:42px;margin-bottom:4px}
+        .logo h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,#fe2c55,#25f4ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .subtitle{font-size:13px;color:rgba(255,255,255,0.4);margin-top:4px}
+        .input-group{display:flex;gap:8px;margin-bottom:16px}
+        textarea{flex:1;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;color:#fff;font-size:14px;resize:none;height:46px;line-height:20px;outline:none;transition:border-color .2s;font-family:inherit}
+        textarea:focus{border-color:#fe2c55}
+        textarea::placeholder{color:rgba(255,255,255,0.25)}
+        .btn{padding:12px 20px;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
+        .btn:active{transform:scale(.96)}
+        .btn:disabled{opacity:.5;pointer-events:none}
+        .btn-parse{background:linear-gradient(135deg,#fe2c55,#ff6b81);color:#fff}
+        .btn-download{background:linear-gradient(135deg,#25f4ee,#00d4ff);color:#000;width:100%;margin-top:8px;padding:14px;font-size:15px}
+        .result{display:none}
+        .result.show{display:block;margin-top:16px}
+        .video-card{background:rgba(255,255,255,0.04);border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)}
+        .video-preview{position:relative;aspect-ratio:9/16;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+        .video-preview img{width:100%;height:100%;object-fit:cover}
+        .video-preview video{width:100%;height:100%;object-fit:contain;display:none;background:#000}
+        .play-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25)}
+        .play-btn{width:56px;height:56px;background:rgba(255,255,255,.9);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:#000}
+        .video-info{padding:14px 16px 8px}
+        .video-desc{font-size:14px;line-height:1.5;margin-bottom:8px;color:#fff;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+        .video-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,.45)}
+        .author-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.06)}
+        .author-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.08)}
+        .author-name{font-size:13px;font-weight:600;color:#fff}
+        .btn-row{padding:0 16px 16px}
+        .error-box{background:rgba(255,59,48,.12);border:1px solid rgba(255,59,48,.25);border-radius:12px;padding:14px;color:#ff3b30;font-size:14px;text-align:center}
+        .loading{text-align:center;padding:32px;color:rgba(255,255,255,.4);font-size:14px}
+        .spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,.1);border-top-color:#fe2c55;border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 12px}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .footer{text-align:center;margin-top:20px;font-size:12px;color:rgba(255,255,255,.2)}
+        .status-bar{text-align:center;padding:8px;font-size:11px;color:rgba(255,255,255,.3)}
+        @media(max-width:360px){.card{padding:20px 14px}.logo h1{font-size:19px}textarea{height:42px;font-size:13px}.btn{padding:10px 16px;font-size:13px}}
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <div class="logo">
-                <div class="logo-icon">🎬</div>
-                <h1>抖音无水印下载器</h1>
-                <p class="subtitle">粘贴分享链接，一键下载</p>
-            </div>
-
-            <div class="input-group">
-                <textarea id="urlInput" placeholder="粘贴抖音分享链接...&#10;支持：短链接 / 长链接 / 分享文本"></textarea>
-                <button class="btn btn-parse" id="parseBtn" onclick="parseVideo()">解析</button>
-            </div>
-
-            <div id="loading" class="loading" style="display:none">
-                <div class="spinner"></div>
-                <div id="loadingText">正在解析视频...</div>
-            </div>
-
-            <div id="result" class="result">
-                <div id="errorBox" class="error-box" style="display:none"></div>
-                <div id="videoCard" class="video-card" style="display:none">
-                    <div class="video-preview" id="preview" onclick="playPreview()">
-                        <img id="coverImg" src="" alt="">
-                        <video id="previewVideo" controls playsinline
-                               webkit-playsinline x5-video-player-type="h5"
-                               x5-video-orientation="portrait"></video>
-                        <div class="play-overlay" id="playOverlay">
-                            <div class="play-btn">▶</div>
-                        </div>
-                    </div>
-                    <div class="video-info">
-                        <div class="video-desc" id="videoDesc"></div>
-                        <div class="video-meta" id="videoMeta"></div>
-                    </div>
-                    <div class="author-row">
-                        <img class="author-avatar" id="authorAvatar" src="" alt="" onerror="this.style.display='none'">
-                        <span class="author-name" id="authorName"></span>
-                    </div>
-                    <div class="btn-row">
-                        <button class="btn btn-download" id="downloadBtn" onclick="downloadVideo()">下载无水印视频</button>
-                    </div>
+<div class="container">
+    <div class="card">
+        <div class="logo">
+            <div class="logo-icon">🎬</div>
+            <h1>抖音无水印下载器</h1>
+            <p class="subtitle">粘贴分享链接，一键下载保存</p>
+        </div>
+        <div id="statusBar" class="status-bar"></div>
+        <div class="input-group">
+            <textarea id="urlInput" placeholder="粘贴抖音分享链接..."></textarea>
+            <button class="btn btn-parse" id="parseBtn" onclick="parseVideo()">解析</button>
+        </div>
+        <div id="loading" class="loading" style="display:none">
+            <div class="spinner"></div>
+            <div id="loadingText">正在解析...</div>
+        </div>
+        <div id="result" class="result">
+            <div id="errorBox" class="error-box" style="display:none"></div>
+            <div id="videoCard" class="video-card" style="display:none">
+                <div class="video-preview" onclick="playPreview()">
+                    <img id="coverImg" src="" alt="">
+                    <video id="previewVideo" controls playsinline></video>
+                    <div class="play-overlay" id="playOverlay"><div class="play-btn">▶</div></div>
+                </div>
+                <div class="video-info">
+                    <div class="video-desc" id="videoDesc"></div>
+                    <div class="video-meta" id="videoMeta"></div>
+                </div>
+                <div class="author-row">
+                    <img class="author-avatar" id="authorAvatar" src="" alt="" onerror="this.style.display='none'">
+                    <span class="author-name" id="authorName"></span>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-download" id="downloadBtn" onclick="downloadVideo()">下载无水印视频</button>
                 </div>
             </div>
         </div>
-        <div class="footer">遵义农商银行</div>
     </div>
+    <div class="footer">遵义农商银行</div>
+</div>
+<script>
+// ====== 后端 API 地址 ======
+const BACKEND = 'https://douyin-backend.onrender.com';
 
-    <script src="js/app.js"></script>
+let videoData = null;
+let permGranted = false;
+
+// 显示状态
+function status(msg, color) {
+    document.getElementById('statusBar').textContent = msg;
+    document.getElementById('statusBar').style.color = color || 'rgba(255,255,255,0.3)';
+}
+
+// ====== 权限请求 ======
+async function requestPermissions() {
+    status('正在准备...', '#25f4ee');
+    try {
+        if (Capacitor && Capacitor.Plugins && Capacitor.Plugins.Filesystem) {
+            const perms = await Capacitor.Plugins.Filesystem.requestPermissions();
+            if (perms && perms.publicStorage === 'granted') {
+                permGranted = true;
+                status('✅ 权限已获取', '#25f4ee');
+            } else {
+                status('⚠️ 需要存储权限才能保存视频', '#ffaa00');
+            }
+        } else {
+            status('⚠️ 插件未就绪', '#ffaa00');
+        }
+    } catch(e) {
+        status('权限请求失败: ' + e.message, '#ff3b30');
+    }
+}
+
+// 页面加载时请求权限
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        requestPermissions();
+    } else {
+        status('🌐 网页模式', 'rgba(255,255,255,0.3)');
+    }
+});
+
+// ====== HTTP 请求 ======
+async function httpGet(url) {
+    const resp = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.text();
+}
+
+async function apiPost(path, data) {
+    const resp = await fetch(BACKEND + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    return await resp.json();
+}
+
+// ====== 下载器逻辑 ======
+function extractVideoId(t) {
+    var u = (t.match(/https?:\/\/[^\s]+/) || [t])[0];
+    var ps = [/\/video\/(\d+)/, /\/share\/video\/(\d+)/, /video_id=(\d+)/, /aweme_id=(\d+)/];
+    for (var i=0; i<ps.length; i++) { var m = u.match(ps[i]); if (m) return {id:m[1],short:false}; }
+    return {id:null, short:true, url:u};
+}
+
+async function resolveShortLink(shortUrl) {
+    try {
+        var resp = await fetch(shortUrl, {redirect:'follow'});
+        var final = resp.url;
+        var m = final.match(/\/video\/(\d+)/);
+        if (m) return m[1];
+    } catch(e) {}
+    var html = await httpGet(shortUrl);
+    for (var p of [/"aweme_id":"(\d+)"/, /"itemId":"(\d+)"/, /\/video\/(\d+)/]) {
+        var m = html.match(p);
+        if (m) return m[1];
+    }
+    return null;
+}
+
+function parseRouterData(html) {
+    var m = html.match(/window\._ROUTER_DATA\s*=\s*/);
+    if (!m) return null;
+    var d=0, s=false, e=false, st=m.index+m[0].length;
+    for (var i=st; i<html.length; i++) {
+        var c=html[i];
+        if (e) {e=false;continue}
+        if (c==='\\'&&s) {e=true;continue}
+        if (c==='"') {s=!s;continue}
+        if (s) continue;
+        if (c==='{') d++; else if (c==='}') {d--; if(d===0) return extractInfo(JSON.parse(html.substring(st,i+1)));}
+    }
+    return null;
+}
+
+function extractInfo(d) {
+    var ld=d.loaderData||{};
+    for (var k in ld) {
+        var v=ld[k];
+        if (typeof v!=='object'||!v.videoInfoRes) continue;
+        var items=(v.videoInfoRes.item_list||[]);
+        if (!items.length) return {error:'视频不存在'};
+        var it=items[0], vi=it.video||{}, pa=vi.play_addr||{}, ul=pa.url_list||[];
+        if (!ul.length) return {error:'未找到视频地址'};
+        var all=[];
+        for (var a=0;a<ul.length&&a<3;a++) {
+            all.push(ul[a].replace('playwm','play'));
+            all.push(ul[a].replace('/playwm/','/play/'));
+            if (ul[a].includes('play')&&!ul[a].includes('playwm')) all.push(ul[a]);
+        }
+        var dl=(vi.download_addr||{}).url_list||[];
+        for (var b=0;b<dl.length&&b<2;b++) all.push(dl[b]);
+        var seen=new Set(),uni=[];
+        for (var c=0;c<all.length;c++){var bs=all[c].split('?')[0];if(!seen.has(bs)){seen.add(bs);uni.push(all[c]);}}
+        return {
+            success:true,aweme_id:it.aweme_id||'',desc:it.desc||'',duration:vi.duration||0,
+            video_url:uni[0]||ul[0].replace('playwm','play'),video_urls:uni,
+            author:{nickname:(it.author||{}).nickname||'',avatar:((it.author||{}).avatar_medium||{}).url_list?.[0]||''},
+            cover_url:(vi.cover||{}).url_list?.[0]||'',stats:it.statistics||{}
+        };
+    }
+    return {error:'解析失败'};
+}
+
+async function parseVideo() {
+    var txt = document.getElementById('urlInput').value.trim();
+    if (!txt) return;
+    showLoading(true);
+    hideResult();
+    try {
+        status('正在解析...', '#25f4ee');
+        // 调用Render后端解析（绕过CORS）
+        var result = await apiPost('/api/parse', {url: txt});
+        if (result.error) throw new Error(result.error);
+        videoData = result;
+        showVideo(result);
+        status('✅ 解析成功', '#25f4ee');
+    } catch(e) {
+        showError(e.message);
+        status('❌ '+e.message, '#ff3b30');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// ====== 下载(原生保存) ======
+function blobToBase64(b) {
+    return new Promise(function(ok,no){
+        var r=new FileReader();
+        r.onloadend=function(){var x=r.result||'';ok(x.split(',')[1]||x);};
+        r.onerror=no;r.readAsDataURL(b);
+    });
+}
+
+async function downloadVideo() {
+    if (!videoData) return;
+    var btn = document.getElementById('downloadBtn');
+    var orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '下载中...';
+
+    try {
+        if (!permGranted && Capacitor && Capacitor.Plugins && Capacitor.Plugins.Filesystem) {
+            status('正在请求权限...', '#25f4ee');
+            var p = await Capacitor.Plugins.Filesystem.requestPermissions();
+            permGranted = p && p.publicStorage === 'granted';
+            if (!permGranted) throw new Error('需要存储权限');
+        }
+
+        var urls = [videoData.video_url];
+        if (videoData.video_urls) for (var i=0;i<videoData.video_urls.length;i++) {
+            if (videoData.video_urls[i] !== videoData.video_url) urls.push(videoData.video_urls[i]);
+        }
+
+        var blob = null;
+        for (var j=0;j<urls.length;j++) {
+            try {
+                var r = await fetch(urls[j]);
+                var ct = r.headers.get('content-type')||'';
+                if (!r.ok || ct.includes('text/html')) continue;
+                blob = await r.blob();
+                if (blob.size > 1000) break;
+            } catch(e) { continue; }
+        }
+        if (!blob) throw new Error('所有链接失效');
+
+        var b64 = await blobToBase64(blob);
+        var filename = 'douyin_'+Date.now()+'.mp4';
+
+        if (Capacitor && Capacitor.Plugins && Capacitor.Plugins.Filesystem && permGranted) {
+            await Capacitor.Plugins.Filesystem.writeFile({
+                path: 'Download/' + filename,
+                data: b64,
+                directory: 'ExternalStorage'
+            });
+            status('✅ 已保存: '+filename, '#25f4ee');
+        } else if (Capacitor && Capacitor.Plugins && Capacitor.Plugins.Filesystem) {
+            // 无外部存储权限，存到app私有目录
+            await Capacitor.Plugins.Filesystem.writeFile({
+                path: filename, data: b64, directory: 'Documents'
+            });
+            status('✅ 已保存到应用目录', '#25f4ee');
+        } else {
+            // 网页模式：打开下载链接
+            window.open(urls[0], '_blank');
+            status('✅ 下载已开始', '#25f4ee');
+        }
+        btn.textContent = '✅ 保存成功';
+    } catch(e) {
+        btn.textContent = '❌ '+e.message;
+        status('❌ '+e.message, '#ff3b30');
+    }
+    setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 2500);
+}
+
+// ====== UI ======
+function showVideo(d) {
+    document.getElementById('coverImg').src = d.cover_url||'';
+    document.getElementById('videoDesc').textContent = d.desc||'无描述';
+    document.getElementById('authorName').textContent = (d.author||{}).nickname||'';
+    var av=document.getElementById('authorAvatar');
+    if(d.author&&d.author.avatar){av.src=d.author.avatar;av.style.display='block'}else{av.style.display='none'}
+    var meta='';
+    if(d.duration){var s=Math.round(d.duration/1000);meta+='<span>⏱ '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0')+'</span>'}
+    if(d.stats){if(d.stats.digg_count)meta+='<span>❤️ '+formatNum(d.stats.digg_count)+'</span>';if(d.stats.comment_count)meta+='<span>💬 '+formatNum(d.stats.comment_count)+'</span>'}
+    document.getElementById('videoMeta').innerHTML=meta;
+    var v=document.getElementById('previewVideo'),o=document.getElementById('playOverlay'),c=document.getElementById('coverImg');
+    o.style.display='flex';c.style.display='block';v.style.display='none';v.src=d.video_url;
+    document.getElementById('videoCard').style.display='block';document.getElementById('errorBox').style.display='none';
+    document.getElementById('result').classList.add('show');
+    document.getElementById('result').scrollIntoView({behavior:'smooth'});
+}
+function playPreview(){
+    document.getElementById('playOverlay').style.display='none';
+    document.getElementById('coverImg').style.display='none';
+    document.getElementById('previewVideo').style.display='block';
+    document.getElementById('previewVideo').play().catch(function(){});
+}
+function showError(m){document.getElementById('videoCard').style.display='none';document.getElementById('errorBox').style.display='block';document.getElementById('errorBox').textContent=m;document.getElementById('result').classList.add('show');}
+function hideResult(){document.getElementById('result').classList.remove('show');document.getElementById('videoCard').style.display='none';document.getElementById('errorBox').style.display='none';}
+function showLoading(s){document.getElementById('loading').style.display=s?'block':'none';document.getElementById('parseBtn').disabled=s;}
+function formatNum(n){return n>=10000?(n/10000).toFixed(1)+'w':n>=1000?(n/1000).toFixed(1)+'k':String(n)}
+document.getElementById('urlInput').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();parseVideo();}});
+</script>
 </body>
 </html>
