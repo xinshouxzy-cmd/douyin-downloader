@@ -313,23 +313,19 @@ def api_parse():
 
 @app.route("/api/download", methods=["POST"])
 def api_download():
-    """重新解析获取最新CDN链接（避免过期）"""
     data = request.get_json()
-    aweme_id = data.get("aweme_id", "").strip()
-    video_url = data.get("video_url", "")
+    video_url = data.get("video_url", "").strip()
+    desc = data.get("desc", "")
+    aweme_id = data.get("aweme_id", "")
     video_urls = data.get("video_urls", [])
 
-    if aweme_id:
-        result = parse_video(aweme_id)
-        if result and result.get("success"):
-            return jsonify(result)
+    if not video_url:
+        return jsonify({"success": False, "error": "缺少视频URL"})
 
-    # fallback: 返回原来的URL
-    all_urls = [video_url]
-    for u in (video_urls or []):
-        if u != video_url and u not in all_urls:
-            all_urls.append(u)
-    return jsonify({"success": True, "video_url": all_urls[0], "video_urls": all_urls})
+    result = download_video_from_url(video_url, desc, aweme_id, video_urls)
+    if result.get("success"):
+        result["download_url"] = f"/downloads/{result['filename']}"
+    return jsonify(result)
 
 
 @app.route("/downloads/<path:filename>")
@@ -675,47 +671,35 @@ HTML = r'''<!DOCTYPE html>
             video.play();
         }
 
-        function blobToBase64(blob) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => { const r = reader.result||''; resolve(r.split(',')[1]||r); };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        }
-
-        function blobToBase64(blob) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => { const r = reader.result||''; resolve(r.split(',')[1]||r); };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        }
-
         async function downloadVideo() {
             if (!currentVideoUrl) return;
 
             const btn = document.getElementById('downloadBtn');
-            const origText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '获取下载链接...';
+            btn.textContent = '下载中...';
 
             try {
-                // 重新从后端拿新鲜链接（CDN有时效性）
                 const resp = await fetch('/api/download', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({video_url: currentVideoUrl, aweme_id: currentAwemeId, video_urls: currentVideoUrls})
+                    body: JSON.stringify({video_url: currentVideoUrl, desc: currentDesc, aweme_id: currentAwemeId, video_urls: currentVideoUrls})
                 });
                 const data = await resp.json();
-                const url = data.success ? data.video_url : currentVideoUrl;
-                window.open(url, '_blank');
-                btn.textContent = '✅ 下载已开始';
-                setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2500);
+
+                if (data.success) {
+                    window.open(data.download_url, '_blank');
+                    btn.textContent = `✅ 下载完成 (${data.file_size})`;
+                    setTimeout(() => {
+                        btn.textContent = '下载无水印视频';
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    btn.textContent = '❌ 下载失败';
+                    btn.disabled = false;
+                    setTimeout(() => { btn.textContent = '下载无水印视频'; }, 2000);
+                }
             } catch (e) {
-                window.open(currentVideoUrl, '_blank');
-                btn.textContent = origText;
+                btn.textContent = '下载无水印视频';
                 btn.disabled = false;
             }
         }
