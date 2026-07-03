@@ -691,30 +691,48 @@ HTML = r'''<!DOCTYPE html>
             });
         }
 
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => { const r = reader.result||''; resolve(r.split(',')[1]||r); };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
         async function downloadVideo() {
             if (!currentVideoUrl) return;
 
             const btn = document.getElementById('downloadBtn');
+            const origText = btn.textContent;
             btn.disabled = true;
             btn.textContent = '下载中...';
 
             try {
-                if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
-                    // APK内：用系统浏览器打开CDN直链，触发安卓原生下载（自动保存到Download目录）
-                    window.open(currentVideoUrl, '_system');
-                    btn.textContent = '✅ 下载已开始';
+                // APK环境：用原生文件系统下载到手机
+                if (typeof Capacitor !== 'undefined' && Capacitor.Plugins.Filesystem) {
+                    const fileResp = await fetch(currentVideoUrl);
+                    if (!fileResp.ok) throw new Error('下载失败');
+                    const blob = await fileResp.blob();
+                    const b64 = await blobToBase64(blob);
+                    const filename = 'douyin_'+Date.now()+'.mp4';
+                    await Capacitor.Plugins.Filesystem.writeFile({
+                        path: filename, data: b64, directory: 'Downloads'
+                    });
+                    btn.textContent = '✅ 已保存到下载目录';
                 } else {
                     // 网页端：直接打开CDN链接
                     window.open(currentVideoUrl, '_blank');
                     btn.textContent = '✅ 下载已开始';
                 }
                 setTimeout(() => {
-                    btn.textContent = '下载无水印视频';
+                    btn.textContent = origText;
                     btn.disabled = false;
                 }, 2500);
             } catch (e) {
-                btn.textContent = '下载无水印视频';
+                btn.textContent = '❌ ' + (e.message || '下载失败');
                 btn.disabled = false;
+                setTimeout(() => { btn.textContent = origText; }, 2500);
             }
         }
 

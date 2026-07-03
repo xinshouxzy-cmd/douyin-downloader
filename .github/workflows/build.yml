@@ -48,6 +48,19 @@ jobs:
         working-directory: app
         run: npx cap sync android
 
+      - name: 添加文件存储权限到Android清单
+        working-directory: app
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          # 在 <manifest> 标签内添加权限
+          sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\
+    <uses-permission android:name="android.permission.INTERNET" />|' "$MANIFEST"
+          echo "=== AndroidManifest permissions ==="
+          head -20 "$MANIFEST"
+
       - name: 生成图标资源
         working-directory: app
         run: |
