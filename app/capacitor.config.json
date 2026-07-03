@@ -2,6 +2,10 @@
   "appId": "com.zynyh.douyin",
   "appName": "抖音无水印下载",
   "webDir": "www",
+  "server": {
+    "url": "https://douyin-backend.onrender.com",
+    "cleartext": true
+  },
   "android": {
     "allowMixedContent": true
   }
