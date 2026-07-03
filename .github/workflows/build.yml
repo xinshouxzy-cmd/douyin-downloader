@@ -51,15 +51,14 @@ jobs:
       - name: 添加文件存储权限到Android清单
         working-directory: app
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          # 在 <manifest> 标签内添加权限
-          sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\
-    <uses-permission android:name="android.permission.INTERNET" />|' "$MANIFEST"
-          echo "=== AndroidManifest permissions ==="
-          head -20 "$MANIFEST"
+          MF="android/app/src/main/AndroidManifest.xml"
+          python3 << 'PYEOF'
+          content = open('android/app/src/main/AndroidManifest.xml').read()
+          perms = '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n'
+          content = content.replace('<manifest', '<manifest>\n' + perms, 1)
+          open('android/app/src/main/AndroidManifest.xml', 'w').write(content)
+          print('Permissions added to manifest')
+          PYEOF
 
       - name: 生成图标资源
         working-directory: app
