@@ -13,26 +13,49 @@ function isCapacitor() {
     return typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform();
 }
 
-// 通用HTTP GET（Capacitor环境直接fetch，无CORS限制）
+// 通用HTTP GET - Capacitor用原生，浏览器用fetch
 async function httpGet(url) {
+    if (isCapacitor()) {
+        // Capacitor: 用原生HTTP插件（绕过WebView CORS）
+        const HttpPlugin = window.Capacitor.Plugins.Http || window.CapacitorHttp;
+        const result = await HttpPlugin.request({
+            method: 'GET',
+            url: url,
+            headers: { 'User-Agent': MOBILE_UA, 'Accept': 'text/html', 'Accept-Language': 'zh-CN' },
+            responseType: 'text',
+            connectTimeout: 15000,
+            readTimeout: 15000
+        });
+        if (result.status !== 200) throw new Error('HTTP ' + result.status);
+        return result.data;
+    }
     const resp = await fetch(url, {
-        headers: {
-            'User-Agent': MOBILE_UA,
-            'Accept': 'text/html,application/xhtml+xml,text/plain,*/*',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-        }
+        headers: { 'User-Agent': MOBILE_UA, 'Accept': 'text/html', 'Accept-Language': 'zh-CN' }
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return await resp.text();
 }
 
-// 跟随重定向获取最终URL
+// 跟随重定向
 async function followRedirect(url) {
-    const resp = await fetch(url, {
-        method: 'HEAD',
-        headers: { 'User-Agent': MOBILE_UA },
-        redirect: 'follow'
-    });
+    if (isCapacitor()) {
+        const HttpPlugin = window.Capacitor.Plugins.Http || window.CapacitorHttp;
+        const result = await HttpPlugin.request({
+            method: 'GET', url: url,
+            headers: { 'User-Agent': MOBILE_UA },
+            responseType: 'text',
+            connectTimeout: 10000, readTimeout: 10000
+        });
+        // 从响应中提取重定向URL
+        if (result.url && result.url !== url) return result.url;
+        // 从HTML提取
+        if (result.data) {
+            const m = result.data.match(/\/video\/(\d+)/);
+            if (m) return 'video_' + m[1];
+        }
+        return url;
+    }
+    const resp = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': MOBILE_UA }, redirect: 'follow' });
     return resp.url;
 }
 
