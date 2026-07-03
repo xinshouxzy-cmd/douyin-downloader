@@ -671,6 +671,15 @@ HTML = r'''<!DOCTYPE html>
             video.play();
         }
 
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => { const r = reader.result||''; resolve(r.split(',')[1]||r); };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
         async function downloadVideo() {
             if (!currentVideoUrl) return;
 
@@ -687,12 +696,34 @@ HTML = r'''<!DOCTYPE html>
                 const data = await resp.json();
 
                 if (data.success) {
-                    window.open(data.download_url, '_blank');
-                    btn.textContent = `✅ 下载完成 (${data.file_size})`;
+                    const dlUrl = data.download_url.startsWith('http') ? data.download_url : location.origin + data.download_url;
+
+                    // APK环境：使用原生文件系统保存
+                    if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+                        try {
+                            const fileResp = await fetch(dlUrl);
+                            const blob = await fileResp.blob();
+                            const b64 = await blobToBase64(blob);
+                            const filename = 'douyin_'+Date.now()+'.mp4';
+                            await Capacitor.Plugins.Filesystem.writeFile({
+                                path: filename, data: b64, directory: 'Downloads'
+                            });
+                            btn.textContent = `✅ 已保存到下载目录 (${data.file_size})`;
+                        } catch(fsErr) {
+                            // 备用：用系统浏览器打开下载链接
+                            window.open(dlUrl, '_system');
+                            btn.textContent = `✅ 下载完成 (${data.file_size})`;
+                        }
+                    } else {
+                        // 浏览器环境：直接打开下载链接
+                        window.open(dlUrl, '_blank');
+                        btn.textContent = `✅ 下载完成 (${data.file_size})`;
+                    }
+
                     setTimeout(() => {
                         btn.textContent = '下载无水印视频';
                         btn.disabled = false;
-                    }, 2000);
+                    }, 2500);
                 } else {
                     btn.textContent = '❌ 下载失败';
                     btn.disabled = false;
