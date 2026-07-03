@@ -13,15 +13,9 @@ function isCapacitor() {
     return typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform();
 }
 
-// 获取可用的HTTP插件
+// 获取原生HTTP插件（绕过WebView CORS）
 function getHttpPlugin() {
-    if (window.CapacitorHttp && typeof window.CapacitorHttp.get === 'function') return window.CapacitorHttp;
-    if (window.CapacitorHttp && typeof window.CapacitorHttp.request === 'function') return window.CapacitorHttp;
-    const P = window.Capacitor && window.Capacitor.Plugins;
-    if (P && P.Http) return P.Http;
-    if (P && P.CapacitorHttp) return P.CapacitorHttp;
-    if (P && P.CommunityHttp) return P.CommunityHttp;
-    return null;
+    return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Http) || null;
 }
 
 // HTTP GET请求
